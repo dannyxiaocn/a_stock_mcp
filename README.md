@@ -1,5 +1,37 @@
 # A股分析助手
 
+## MCP工具列表
+
+本项目提供了5个核心MCP工具，可以在对话中调用：
+
+1. **获取个股财务数据工具** - 提取东方财富和雪球的个股基本信息、实时盘口数据和历史行情数据
+   ```py
+   @mcp.tool()
+   def get_one_stock_financial_data(symbol_em: str) -> str:
+   ```
+2. **股价走势跟踪工具** - 生成专业K线图并展示股票价格变动数据和技术指标
+   ```py
+   @mcp.tool()
+   def generate_stock_trend(symbol: str, time_period: str) -> str:
+   ```
+3. **财务指标计算工具** - 计算并分析市盈率、市净率、波动率等关键财务指标，提供综合评分
+   ```py
+   @mcp.tool()
+   def calculate_fundamentals(symbol: str) -> str:
+   ```
+4. **市场新闻分析工具** - 整合市场环境、行业和地区交易数据，分析资金流向和市场情绪
+   ```py
+   @mcp.tool()
+   def analyze_market_news(symbol: str) -> str:
+   ```
+5. **综合分析工具** - 使用Inner-LLM对所有数据进行智能分析，提供全面的投资建议
+   ```py
+   @mcp.tool()
+   def comprehensive_analysis(symbol: str) -> str:
+   ```
+
+对于MCP的详细设计见 `resources/report.md`
+
 ## 安装
 
 ### 安装依赖
@@ -35,35 +67,27 @@ cd ..
         "--with",
         "akshare",
         "--with",
+        "matplotlib",
+        "--with",
         "mcp[cli]",
+        "--with",
+        "mplfinance",
+        "--with",
+        "openai",
         "mcp",
         "run",
-        "YOUR_PATH/a_stock_mcp/main.py"
+        "/Users/xiaobocheng/a_stock_mcp/main.py"
       ]
     }
   }
 }
 ```
 
-**建议使用 Cursor/Windsurf**，以便体验更加全面的 MCP 服务（包括自动生成 K线图，以及 Inner-LLM 智能分析）
-
-### 作为 Claude MCP 插件使用（因为 Claude 环境问题，K线图生成和Inner-LLM功能无法使用，但不耽误其他所有分析/投资建议功能）
+### 作为 Claude MCP 插件使用
 
 ```shell
-uv run mcp install claude_mcp.py
+uv run mcp install main.py
 ```
-
-## MCP工具列表
-
-本项目提供了5个核心MCP工具，可以在对话中调用：
-
-1. **获取个股财务数据工具** - 提取东方财富和雪球的个股基本信息、实时盘口数据和历史行情数据
-2. **股价走势跟踪工具** - 生成专业K线图并展示股票价格变动数据和技术指标
-3. **财务指标计算工具** - 计算并分析市盈率、市净率、波动率等关键财务指标，提供综合评分
-4. **市场新闻分析工具** - 整合市场环境、行业和地区交易数据，分析资金流向和市场情绪
-5. **综合分析工具** - 使用Inner-LLM对所有数据进行智能分析，提供全面的投资建议
-
-对于MCP的详细设计见 `resources/report.md`
 
 ## 主要功能说明
 

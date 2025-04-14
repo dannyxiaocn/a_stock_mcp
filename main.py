@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import tempfile
 
 # Create an MCP server
-mcp = FastMCP("A股分析助手", dependencies=["akshare", "openai"])
+mcp = FastMCP("A股分析助手", dependencies=["akshare", "openai", "mplfinance", "matplotlib"])
 
 @mcp.tool()
 def get_one_stock_financial_data(symbol_em: str) -> str:
@@ -1111,7 +1111,7 @@ def comprehensive_analysis(symbol: str) -> str:
     
     LLM_input = "\n".join(comprehensive_report)
     
-    OPENROUTER_API_KEY = f"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"
+    OPENROUTER_API_KEY = f"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"
 
     from openai import OpenAI
 
@@ -1121,7 +1121,7 @@ def comprehensive_analysis(symbol: str) -> str:
     )
 
     completion = client.chat.completions.create(
-        model="openrouter/optimus-alpha",
+        model="google/gemini-2.5-pro-exp-03-25:free",
         messages=[
             {"role": "system", "content": "你是一位专业的金融分析师，正在根据财务数据、市场新闻和股票走势对A股股票进行综合股票分析。"},
             {"role": "user", "content": LLM_input}

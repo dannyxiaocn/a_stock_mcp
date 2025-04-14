@@ -1,4 +1,4 @@
-# 4.14
+# 解题思路
 
 ## 基础框架
 - 根据官方的MCP SDK搞定了基本框架
@@ -314,7 +314,7 @@
 - 流动性风险: 市场流动性变化可能导致价格波动
 - 公司基本面风险: 业绩不及预期可能导致股价调整
 
-### 使用Inner-LLM提供投资建议（不适用于Claude,但可以在 Windsurf中使用）
+### 使用Inner-LLM提供投资建议
 
 在之前的每个部分中，都生成了对应的投资建议，这里我会使用 
 ```py
@@ -322,3 +322,4 @@
 def comprehensive_analysis(symbol: str) -> str
 ```
 来做一个内部的 api calling 来达到，使用 AI 对所有数据进行分析的效果，这样可以保证个股分析的独立性，同时不会大量占据主LLM的上下文空间。
+目前使用的是 openrouter 的 `google/gemini-2.5-pro-exp-03-25:free`
