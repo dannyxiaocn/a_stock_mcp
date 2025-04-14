@@ -14,11 +14,7 @@
    @mcp.tool()
    def generate_stock_trend(symbol: str, time_period: str) -> str:
    ```
-3. **财务指标计算工具** - 计算并分析市盈率、市净率、波动率等关键财务指标，提供综合评分
-   ```py
-   @mcp.tool()
-   def calculate_fundamentals(symbol: str) -> str:
-   ```
+3. **财务指标计算工具** - 计算并分析市盈率、市净率、波动率等关键财务指标，提供综合评分（融合进 `get_one_stock_financial_data`）
 4. **市场新闻分析工具** - 整合市场环境、行业和地区交易数据，分析资金流向和市场情绪
    ```py
    @mcp.tool()
