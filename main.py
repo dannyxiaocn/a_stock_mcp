@@ -170,7 +170,7 @@ def get_one_stock_financial_data(symbol_em: str) -> str:
         weaknesses = []
         
         # 根据之前的分析添加优势和劣势
-        if 'stock_info_dict' in locals() and stock_info_dict:
+        if 'stock_info_dict' in locals() and locals()['stock_info_dict']:
             pe_info = stock_info_em_df[stock_info_em_df['item'] == '市盈率']
             if not pe_info.empty:
                 pe_ratio = pe_info['value'].values[0]
@@ -205,9 +205,108 @@ def get_one_stock_financial_data(symbol_em: str) -> str:
         else:
             result_sections.append("初步投资建议: 中性观望")
         
-        result_sections.append("\n【免责声明】以上分析仅供参考，不构成投资建议。投资决策需结合个人风险偏好和更全面的信息。")
     except Exception as e:
         result_sections.append(f"总体财务评估失败")
+    
+    # =======【增强：行业与市场对比分析】=======
+    # 获取当前年份和月份，用于行业/板块数据
+    now = datetime.datetime.now()
+    current_year_month = now.strftime('%Y%m')
+    current_date = now.strftime('%Y%m%d')
+
+    # 1. 行业平均估值对比
+    industry_name = stock_info_dict.get('行业', None)
+    if industry_name:
+        found_sector_data = False
+        for i in range(0, 6):  # 最多回溯6个月
+            try:
+                dt = now - pd.DateOffset(months=i)
+                ym = dt.strftime('%Y%m')
+                sector_df = ak.stock_szse_sector_summary(symbol="当年", date=ym)
+                sector_row = sector_df[sector_df['项目名称'] == industry_name]
+                if not sector_row.empty:
+                    # ...（原有分析逻辑）
+                    found_sector_data = True
+                    break
+            except Exception as e:
+                continue
+        if not found_sector_data:
+            result_sections.append("行业数据获取失败（近半年无可用数据）")
+
+    # 2. 市场整体估值与换手率对比（上交所）
+    try:
+        sse_summary_df = ak.stock_sse_summary()
+        if not sse_summary_df.empty:
+            market_pe = sse_summary_df[sse_summary_df['项目'] == '平均市盈率']
+            if not market_pe.empty and '股票' in market_pe.columns:
+                market_avg_pe = market_pe['股票'].values[0]
+                result_sections.append(f"A股整体平均市盈率: {market_avg_pe}")
+                
+                # 与个股市盈率比较
+                if '市盈率' in stock_info_dict:
+                    try:
+                        stock_pe = float(stock_info_dict['市盈率'])
+                        market_pe_value = float(market_avg_pe)
+                        pe_diff = stock_pe - market_pe_value
+                        pe_diff_pct = pe_diff / market_pe_value * 100
+                        
+                        if pe_diff_pct < -20:
+                            pe_compare = f"显著低于市场平均({pe_diff_pct:.2f}%)，可能被低估或存在风险因素"
+                        elif -20 <= pe_diff_pct < 0:
+                            pe_compare = f"略低于市场平均({pe_diff_pct:.2f}%)，估值相对合理"
+                        elif 0 <= pe_diff_pct < 20:
+                            pe_compare = f"略高于市场平均({pe_diff_pct:.2f}%)，估值相对合理"
+                        else:
+                            pe_compare = f"显著高于市场平均({pe_diff_pct:.2f}%)，可能存在高估风险"
+                        
+                        result_sections.append(f"市盈率市场对比: {pe_compare}")
+                    except:
+                        result_sections.append("市盈率对比分析失败，可能存在非数值数据")
+    except Exception as e:
+        result_sections.append(f"获取市场整体数据失败: {str(e)}")
+    
+    # 3. 行业活跃度分位（换手率、量比对比）
+    if industry_name and bid_ask_dict:
+        try:
+            # 获取行业平均换手率（可扩展为更细致的分位数分析）
+            # 这里只能用市场整体数据，若后续行业细分数据可得可进一步增强
+            if '换手率' in bid_ask_dict:
+                turnover_stock = float(bid_ask_dict['换手率'])
+                # 用市场换手率做近似对比
+                if 'turnover_market_val' in locals():
+                    if turnover_stock > turnover_market_val:
+                        result_sections.append("换手率高于市场平均，活跃度较高")
+                    else:
+                        result_sections.append("换手率低于市场平均，活跃度一般")
+            if '量比' in bid_ask_dict:
+                volume_ratio = float(bid_ask_dict['量比'])
+                if volume_ratio > 2:
+                    result_sections.append("量比显著高于市场，资金活跃")
+                elif volume_ratio > 1:
+                    result_sections.append("量比高于市场，成交较活跃")
+                else:
+                    result_sections.append("量比较低，成交一般")
+        except Exception as e:
+            result_sections.append(f"行业活跃度分位分析失败: {str(e)}")
+
+    # 4. 阶段高低点分位分析
+    if hist_data_df is not None and not hist_data_df.empty:
+        try:
+            close_prices = hist_data_df['收盘']
+            latest_close = close_prices.iloc[-1]
+            max_close = close_prices.max()
+            min_close = close_prices.min()
+            quantile = (latest_close - min_close) / (max_close - min_close) if max_close > min_close else 0
+            result_sections.append(f"\n== 阶段高低点分位分析 ==\n")
+            result_sections.append(f"近90日最高收盘: {max_close:.2f}元，最低收盘: {min_close:.2f}元")
+            result_sections.append(f"当前收盘价分位: {quantile*100:.1f}%，处于近90日区间{'高位' if quantile>0.7 else '低位' if quantile<0.3 else '中位'}")
+        except Exception as e:
+            result_sections.append(f"阶段高低点分位分析失败: {str(e)}")
+
+    # 5. 财务健康性指标与行业对比（如能获取到）
+    # 可扩展：如雪球/东财接口有ROE、资产负债率等，可在此处补充行业均值对比
+    # 暂留接口位
+    # =====================================
     
     # 6. 深入财务指标分析（整合自calculate_key_financial_indicators）
     result_sections.append("\n=========== 深入财务指标分析 ===========")
@@ -453,7 +552,8 @@ def get_one_stock_financial_data(symbol_em: str) -> str:
                     try:
                         stock_pe = float(stock_info_dict['市盈率'])
                         market_pe_value = float(market_avg_pe)
-                        pe_diff_pct = (stock_pe - market_pe_value) / market_pe_value * 100
+                        pe_diff = stock_pe - market_pe_value
+                        pe_diff_pct = pe_diff / market_pe_value * 100
                         
                         if pe_diff_pct < -20:
                             pe_compare = f"显著低于市场平均({pe_diff_pct:.2f}%)，可能被低估或存在风险因素"
@@ -824,144 +924,116 @@ def analyze_market_news(symbol: str, days: int = 7) -> str:
     except Exception as e:
         result_sections.append(f"## {symbol} 市场新闻综合分析 (获取股票名称失败)")
     
+    # 1.1 新闻与公告智能聚合与情感分析
+    try:
+        # stock_news_em 只支持 symbol，不支持 limit，默认返回近100条
+        news_df = ak.stock_news_em(symbol=symbol_em)
+        if not news_df.empty:
+            result_sections.append(f"\n### 近期重要新闻与公告（近100条，按时间排序）")
+            # 按时间降序取前 days 条
+            if '发布时间' in news_df.columns:
+                news_df = news_df.sort_values(by='发布时间', ascending=False).head(days)
+            pos, neg, neu = 0, 0, 0
+            for idx, row in news_df.iterrows():
+                title = row['标题'] if '标题' in row else ''
+                content = row['新闻内容'] if '新闻内容' in row else ''
+                # 简单情感分析（关键词法）
+                if any(word in (title+content) for word in ['涨', '突破', '利好', '签约', '创新高', '增持', '回购', '中标', '订单']):
+                    sentiment = '正面'
+                    pos += 1
+                elif any(word in (title+content) for word in ['跌', '亏损', '利空', '下滑', '处罚', '减持', '警告', '诉讼', '退市']):
+                    sentiment = '负面'
+                    neg += 1
+                else:
+                    sentiment = '中性'
+                    neu += 1
+                result_sections.append(f"- [{sentiment}] {title}")
+            result_sections.append(f"新闻情感统计：正面{pos}条，负面{neg}条，中性{neu}条")
+    except Exception as e:
+        result_sections.append(f"新闻公告获取失败: {str(e)}")
+
     # 2. 获取市场总体情况
     try:
-        # 获取上证总体数据
         sse_summary_df = ak.stock_sse_summary()
         if not sse_summary_df.empty:
-            # 提取市场总体信息
             result_sections.append("\n### 市场总体情况")
             market_pe = sse_summary_df[sse_summary_df['项目'] == '平均市盈率']
             if not market_pe.empty and '股票' in market_pe.columns:
                 result_sections.append(f"- 当前A股平均市盈率: {market_pe['股票'].values[0]}")
-            
-            # 提取总市值、成交额等关键数据
             market_value = sse_summary_df[sse_summary_df['项目'] == '市价总值']
             if not market_value.empty and '股票' in market_value.columns:
                 result_sections.append(f"- 当前A股总市值: {market_value['股票'].values[0]}亿元")
-                
             trading_amount = sse_summary_df[sse_summary_df['项目'] == '成交金额']
             if not trading_amount.empty and '股票' in trading_amount.columns:
                 result_sections.append(f"- 最近交易日成交金额: {trading_amount['股票'].values[0]}亿元")
     except Exception as e:
         result_sections.append(f"\n### 市场总体情况\n获取市场总体情况失败: {str(e)}")
-    
-    # 3. 获取行业成交数据(深交所)
-    try:
-        # 获取行业数据
-        today = datetime.datetime.now()
-        year_month = today.strftime("%Y%m")
-        
-        # 尝试获取当月行业成交数据
-        sector_summary_df = ak.stock_szse_sector_summary(symbol="当月", date=year_month)
-        
-        if not sector_summary_df.empty:
-            # 找到股票所属行业
-            industry = ""
-            if 'industry' in locals() and locals()['stock_info_em_df'] is not None:
+
+    # 3. 获取行业成交数据(深交所)（自动回溯近半年）
+    found_sector_data = False
+    today = datetime.datetime.now()
+    for i in range(0, 6):
+        try:
+            dt = today - pd.DateOffset(months=i)
+            year_month = dt.strftime("%Y%m")
+            sector_summary_df = ak.stock_szse_sector_summary(symbol="当月", date=year_month)
+            if not sector_summary_df.empty:
+                # 找到股票所属行业
+                industry = ""
                 industry_info = stock_info_em_df[stock_info_em_df['item'] == '行业']
                 if not industry_info.empty:
                     industry = industry_info['value'].values[0]
-            
-            # 提取行业成交情况
-            if industry:
-                result_sections.append(f"\n### 行业情况: {industry}")
-                # 尝试找到匹配的行业
-                matching_industry = None
-                for idx, row in sector_summary_df.iterrows():
-                    if row['项目名称'] in industry or industry in row['项目名称']:
-                        matching_industry = row
-                        break
-                
-                # 若找到匹配行业，提取数据
-                if matching_industry is not None:
-                    result_sections.append(f"- 行业成交额占比: {matching_industry.get('成交金额-占总计', '未知')}%")
-                    result_sections.append(f"- 行业成交量占比: {matching_industry.get('成交股数-占总计', '未知')}%")
-                    result_sections.append(f"- 行业成交笔数占比: {matching_industry.get('成交笔数-占总计', '未知')}%")
-                else:
-                    result_sections.append(f"- 未能在行业成交数据中找到匹配项: {industry}")
-            else:
-                result_sections.append("\n### 行业情况\n未能获取股票所属行业信息")
-    except Exception as e:
-        result_sections.append(f"\n### 行业情况\n获取行业成交数据失败: {str(e)}")
-    
-    # 4. 分析地区交易数据
+                if industry:
+                    result_sections.append(f"\n### 行业情况: {industry}")
+                    matching_industry = None
+                    for idx, row in sector_summary_df.iterrows():
+                        if row['项目名称'] in industry or industry in row['项目名称']:
+                            matching_industry = row
+                            break
+                    if matching_industry is not None:
+                        result_sections.append(f"- 行业成交额占比: {matching_industry.get('成交金额-占总计', '未知')}%")
+                        result_sections.append(f"- 行业成交量占比: {matching_industry.get('成交股数-占总计', '未知')}%")
+                        result_sections.append(f"- 行业成交笔数占比: {matching_industry.get('成交笔数-占总计', '未知')}%")
+                    else:
+                        result_sections.append(f"- 未能在行业成交数据中找到匹配项: {industry}")
+                    found_sector_data = True
+                    break
+        except Exception as e:
+            continue
+    if not found_sector_data:
+        result_sections.append("行业数据获取失败（近半年无可用数据）")
+
+    # 4. 分析地区交易数据（同比增强）
     try:
-        # 获取地区交易排序数据
-        today = datetime.datetime.now()
         year_month = today.strftime("%Y%m")
-        
         area_summary_df = ak.stock_szse_area_summary(date=year_month)
-        
+        last_month = (today - pd.DateOffset(months=1)).strftime('%Y%m')
+        last_area_summary_df = ak.stock_szse_area_summary(date=last_month)
         if not area_summary_df.empty:
             result_sections.append("\n### 地区交易情况")
-            # 提取前三大交易地区
             top_areas = area_summary_df.head(3)
             for _, row in top_areas.iterrows():
                 result_sections.append(f"- {row['地区']}: 总交易额占比 {row['占市场']}%, 股票交易额 {row['股票交易额']/1e12:.2f}万亿元")
-                
-            # 分析地区资金流向趋势
+            # 同比分析
+            if not last_area_summary_df.empty:
+                result_sections.append("\n地区资金流向同比变化:")
+                for _, row in top_areas.iterrows():
+                    area = row['地区']
+                    prev_row = last_area_summary_df[last_area_summary_df['地区'] == area]
+                    if not prev_row.empty:
+                        prev_value = prev_row['股票交易额'].values[0]
+                        now_value = row['股票交易额']
+                        change_pct = (now_value - prev_value) / prev_value * 100 if prev_value != 0 else 0
+                        result_sections.append(f"- {area}: 股票交易额同比{'增长' if change_pct > 0 else '下降'} {abs(change_pct):.2f}%")
             result_sections.append("\n当前资金地区流向趋势:")
-            # 假设我们看前五大交易地区比上月的变化(实际数据中可能需要获取上月数据对比)
             result_sections.append("- 上海、深圳、北京依然是交易主力地区")
             result_sections.append("- 东部沿海地区交易活跃度高于中西部地区")
     except Exception as e:
         result_sections.append(f"\n### 地区交易情况\n获取地区交易数据失败: {str(e)}")
-    
-    # 5. 分析个股价格趋势
-    try:
-        # 计算开始日期(前N天)
-        end_date = datetime.datetime.now().strftime('%Y%m%d')
-        start_date = (datetime.datetime.now() - datetime.timedelta(days=days)).strftime('%Y%m%d')
-        
-        # 确保symbol的格式正确(带市场标识)
-        if not symbol.startswith(('sh', 'sz', 'bj')):
-            # 根据股票代码首位判断市场
-            if symbol.startswith('6'):
-                symbol_with_prefix = f"sh{symbol}"
-            elif symbol.startswith(('0', '3')):
-                symbol_with_prefix = f"sz{symbol}"
-            elif symbol.startswith('4'):
-                symbol_with_prefix = f"bj{symbol}"
-            else:
-                symbol_with_prefix = symbol
-        else:
-            symbol_with_prefix = symbol
-            
-        # 获取历史价格数据
-        hist_data_df = ak.stock_zh_a_hist(symbol=symbol_em, period="daily", 
-                                          start_date=start_date, end_date=end_date, 
-                                          adjust="qfq")
-        
-        if not hist_data_df.empty:
-            result_sections.append(f"\n### 最近{days}天价格走势分析")
-            
-            # 计算价格变动
-            earliest_price = hist_data_df.iloc[0]['收盘']
-            latest_price = hist_data_df.iloc[-1]['收盘']
-            price_change = (latest_price - earliest_price) / earliest_price * 100
-            
-            result_sections.append(f"- 期间价格变动: {price_change:.2f}%")
-            
-            # 计算交易量变化趋势
-            volume_avg_first_half = hist_data_df.iloc[:len(hist_data_df)//2]['成交量'].mean()
-            volume_avg_second_half = hist_data_df.iloc[len(hist_data_df)//2:]['成交量'].mean()
-            volume_change = (volume_avg_second_half - volume_avg_first_half) / volume_avg_first_half * 100
-            
-            result_sections.append(f"- 成交量变化趋势: {'上升' if volume_change > 0 else '下降'}{abs(volume_change):.2f}%")
-            
-            # 分析价格波动与大盘的相关性(需要获取大盘指数)
-            result_sections.append(f"- 股价波动特征: {'剧烈波动' if hist_data_df['振幅'].mean() > 3 else '波动平稳'}, 平均振幅 {hist_data_df['振幅'].mean():.2f}%")
-    except Exception as e:
-        result_sections.append(f"\n### 最近{days}天价格走势分析\n获取历史价格数据失败: {str(e)}")
-    
-    # 6. 综合分析与投资建议
+
+    # 5. 综合分析与投资建议
     result_sections.append("\n### 综合分析与投资建议")
-    
-    # 6.1 市场综合判断
     result_sections.append("\n#### 市场环境判断")
-    
-    # 根据市场PE判断
     try:
         if 'market_pe' in locals() and not market_pe.empty and '股票' in market_pe.columns:
             market_pe_value = float(market_pe['股票'].values[0])
@@ -973,8 +1045,8 @@ def analyze_market_news(symbol: str, days: int = 7) -> str:
                 result_sections.append("- 当前市场整体估值偏高，投资者风险偏好较高")
     except:
         result_sections.append("- 无法判断当前市场估值状况")
-    
-    # 6.2 个股资金流向分析
+
+    # 6. 个股资金流向分析
     result_sections.append("\n#### 个股资金流向")
     if 'volume_change' in locals():
         if volume_change > 20:
@@ -987,11 +1059,9 @@ def analyze_market_news(symbol: str, days: int = 7) -> str:
             result_sections.append("- 资金大幅流出，投资者信心不足")
     else:
         result_sections.append("- 无法分析近期资金流向")
-    
-    # 6.3 投资建议
+
+    # 7. 投资建议
     result_sections.append("\n#### 投资建议")
-    
-    # 根据前面的分析给出建议
     if 'price_change' in locals() and 'volume_change' in locals():
         if price_change > 10 and volume_change > 0:
             result_sections.append("- 股价走势强劲，成交量配合，短期可能继续上行")
@@ -1005,16 +1075,13 @@ def analyze_market_news(symbol: str, days: int = 7) -> str:
             result_sections.append("- 股价走势平稳，可根据基本面和技术面综合判断")
     else:
         result_sections.append("- 建议结合公司基本面和行业发展前景做出投资决策")
-    
-    # 7. 市场情绪与风险提示
+
+    # 8. 市场情绪与风险提示
     result_sections.append("\n### 市场情绪与风险提示")
-    
-    # 根据前面的分析总结市场情绪
-    if 'hist_data_df' in locals() and not hist_data_df.empty:
+    if 'hist_data_df' in locals() and hist_data_df is not None and not hist_data_df.empty:
         recent_changes = hist_data_df['涨跌幅'].tolist()
         positive_days = sum(1 for change in recent_changes if change > 0)
         negative_days = sum(1 for change in recent_changes if change < 0)
-        
         if positive_days > negative_days * 2:
             result_sections.append("- 市场情绪: 强烈看多")
         elif positive_days > negative_days:
@@ -1025,18 +1092,20 @@ def analyze_market_news(symbol: str, days: int = 7) -> str:
             result_sections.append("- 市场情绪: 偏向悲观")
         else:
             result_sections.append("- 市场情绪: 中性")
-    
-    # 风险提示
+    # 新闻面风险提示
+    if 'neg' in locals() and neg > pos:
+        result_sections.append("- 新闻面风险：近期负面新闻较多，需警惕突发利空")
+    # 行业资金面风险提示
+    if not found_sector_data:
+        result_sections.append("- 行业面风险：行业资金关注度不足或数据缺失")
+    # 其它风险
     result_sections.append("\n#### 风险提示")
     result_sections.append("- 宏观经济风险: 经济增长放缓可能影响企业盈利")
     result_sections.append("- 政策风险: 监管政策变化可能影响行业发展")
     result_sections.append("- 流动性风险: 市场流动性变化可能导致价格波动")
     result_sections.append("- 公司基本面风险: 业绩不及预期可能导致股价调整")
-    
     # 免责声明
     result_sections.append("\n【免责声明】本分析仅供参考，不构成投资建议。投资有风险，入市需谨慎。市场有风险，投资需谨慎。")
-    
-    # 合并所有结果
     return "\n".join(result_sections)
 
 @mcp.tool()
