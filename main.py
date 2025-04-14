@@ -1111,7 +1111,7 @@ def comprehensive_analysis(symbol: str) -> str:
     
     LLM_input = "\n".join(comprehensive_report)
     
-    OPENROUTER_API_KEY = f"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"
+    OPENROUTER_API_KEY = f"API-KEY"
 
     from openai import OpenAI
 
