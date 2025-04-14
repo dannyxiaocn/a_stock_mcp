@@ -8,6 +8,14 @@
 pip install -r requirements.txt
 ```
 
+安装 `akshare`:
+
+```shell
+cd akshare
+pip install -e .
+cd ..
+```
+
 同时也需要安装 `uv` 以及 `node.js` 以避免 error
 可参考 [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
 
@@ -44,6 +52,18 @@ pip install -r requirements.txt
 ```shell
 uv run mcp install claude_mcp.py
 ```
+
+## MCP工具列表
+
+本项目提供了5个核心MCP工具，可以在对话中调用：
+
+1. **获取个股财务数据工具** - 提取东方财富和雪球的个股基本信息、实时盘口数据和历史行情数据
+2. **股价走势跟踪工具** - 生成专业K线图并展示股票价格变动数据和技术指标
+3. **财务指标计算工具** - 计算并分析市盈率、市净率、波动率等关键财务指标，提供综合评分
+4. **市场新闻分析工具** - 整合市场环境、行业和地区交易数据，分析资金流向和市场情绪
+5. **综合分析工具** - 使用Inner-LLM对所有数据进行智能分析，提供全面的投资建议
+
+对于MCP的详细设计见 `resources/report.md`
 
 ## 主要功能说明
 
@@ -86,7 +106,6 @@ uv run mcp install claude_mcp.py
 ## 免责声明
 
 本工具提供的分析结果仅供参考，不构成投资建议。投资决策需结合个人风险偏好和更全面的信息。投资有风险，入市需谨慎。
-
 
 ## 案例: 赛力斯汽车(601127)投资分析报告
 
