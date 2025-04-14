@@ -12,7 +12,7 @@
 2. **股价走势跟踪工具** - 生成专业K线图并展示股票价格变动数据和技术指标
    ```py
    @mcp.tool()
-   def generate_stock_trend(symbol: str, time_period: str) -> str:
+   def track_stock_trend(symbol: str, period: str = "daily", days: int = 15) -> str:
    ```
 3. **财务指标计算工具** - 计算并分析市盈率、市净率、波动率等关键财务指标，提供综合评分（融合进 `get_one_stock_financial_data`）
 
