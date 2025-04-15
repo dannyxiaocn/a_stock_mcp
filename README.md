@@ -73,7 +73,7 @@ cd ..
         "openai",
         "mcp",
         "run",
-        "/Users/xiaobocheng/a_stock_mcp/main.py"
+        "YOUR_PATH_TO/a_stock_mcp/main.py"
       ]
     }
   }
