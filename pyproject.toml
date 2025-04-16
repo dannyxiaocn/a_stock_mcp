@@ -1,7 +1,7 @@
 [project]
-name = "mcp"
+name = "a_stock_mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "A股分析助手"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
