@@ -10,6 +10,10 @@
 而后，和 AI 一起将其中的内容实现，对于 AKShare 的 API 接口使用过程中，AI 会产生比较强的 Hallucination，需要人（我）来仔细检查和纠正（这是因为 AKShare 的 API 文档过长，会很大程度上影响模型的注意力计算，从而导致错误，同时，这也影响了指令追踪的性能）。
 面对 AKShare API 的长文档 + 代码的复杂性、以及开发过程中的多轮对话，AI 会面对整体 context 超出上下文限制的问题，这时需要使用者对整个信息库进行 Indexing（属于使用 RAG 来缓解超长上下文），来缓解上下文压力的同时保持效果。
 
+在测试过程中发现数据获取失败的情况，因此采用两个思路来保证数据稳定性：
+1. 使用重试机制：当数据获取失败时，自动重试多次
+2. 使用多数据源：同时使用多个数据源获取数据，来增强数据的容错备份
+
 ## 基础框架
 - 根据官方的MCP SDK搞定了基本框架
 - 了解了akshare里面的function接口
@@ -338,4 +342,53 @@
 def comprehensive_analysis(symbol: str) -> str
 ```
 来做一个内部的 api calling 来达到，使用 AI 对所有数据进行分析的效果，这样可以保证个股分析的独立性，同时不会大量占据主LLM的上下文空间。
-目前使用的是 openrouter 的 `google/gemini-2.5-pro-exp-03-25:free`
+目前使用的是 openrouter 的 `google/gemini-2.5-pro-preview-03-25`
+
+### 数据获取容错机制
+
+本项目实现了强大的数据获取容错机制，确保API调用的稳定性：
+
+```python
+def retry_get_data(func, max_retries=3, retry_interval=1, **kwargs):
+    """
+    通用数据获取重试机制
+    :param func: 数据获取函数（如 ak.xxx）
+    :param max_retries: 最大重试次数
+    :param retry_interval: 每次重试间隔秒数
+    :param kwargs: 传递给 func 的参数
+    :return: func 返回值或抛出最后一次异常
+    """
+```
+
+该机制为所有数据源接口提供了自动重试能力，增强了程序的稳定性和容错性。
+
+### 多种数据源接口
+
+各工具使用的AKShare数据接口，共计21个：
+
+#### 获取个股财务数据工具
+- `ak.stock_individual_info_em` - 东方财富个股基本信息
+- `ak.stock_individual_basic_info_xq` - 雪球个股基本信息
+- `ak.stock_bid_ask_em` - 实时盘口数据
+- `ak.stock_zh_a_hist` - 历史行情数据
+- `ak.stock_profit_forecast_ths` - 同花顺预测年报净利润
+- `ak.stock_yjkb_em` - 业绩快报
+- `ak.stock_yjyg_em` - 业绩预告
+- `ak.stock_em_analyst_detail` - 机构评级
+- `ak.stock_em_analyst_rank_institute` - 备用机构评级
+- `ak.stock_szse_sector_summary` - 行业平均估值
+- `ak.stock_sse_summary` - 市场整体估值与换手率
+
+#### 股价走势跟踪工具
+- `ak.stock_zh_a_hist` - 股票历史行情数据
+
+#### 市场新闻分析工具
+- `ak.stock_news_em` - 个股新闻
+- `ak.stock_hsgt_hist_em` - 北向资金历史
+- `ak.stock_hsgt_board_rank_em` - 北向资金行业板块排行
+- `ak.stock_individual_fund_flow` - 个股资金流
+- `ak.stock_info_global_em` - 全球财经快讯-东财财富
+- `ak.stock_info_global_sina` - 全球财经快讯-新浪财经
+- `ak.stock_info_global_futu` - 全球财经快讯-富途牛牛
+- `ak.stock_info_global_ths` - 全球财经直播-同花顺财经
+- `ak.stock_info_global_cls` - 电报-财联社
