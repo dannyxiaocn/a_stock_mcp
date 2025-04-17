@@ -90,6 +90,7 @@ pip install -r requirements.txt
 安装 `akshare`:
 
 ```shell
+git clone https://github.com/akfamily/akshare.git
 cd akshare
 pip install -e .
 cd ..
